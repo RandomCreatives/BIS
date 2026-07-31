@@ -21,9 +21,9 @@ export default async function ProtectedLayout({
   const { user, profile } = await getCurrentContext();
   if (!user) redirect('/login');
 
-  if (!profile) {
-    // Authenticated in Supabase Auth but no staff profile — e.g. invited user
-    // whose metadata was missing a role, or a deleted profile.
+  if (!profile || !profile.is_active) {
+    // RLS intentionally hides deactivated profiles, so use one message for a
+    // missing, incomplete, or disabled staff record without disclosing state.
     return (
       <div className="flex min-h-screen items-center justify-center bg-bone p-6">
         <div className="max-w-md overflow-hidden rounded-xl border border-line bg-white shadow-sm">
@@ -31,10 +31,10 @@ export default async function ProtectedLayout({
             SOAMS OS — account notice
           </div>
           <div className="p-8">
-            <h1 className="font-display text-lg font-bold text-ink">Account not set up</h1>
+            <h1 className="font-display text-lg font-bold text-ink">Account unavailable</h1>
             <p className="mt-2 text-sm text-ink/70">
-              Your login exists but no staff profile was found. Ask your school
-              administrator to check your account&apos;s role assignment.
+              Your staff profile is not active or has not been fully configured.
+              Ask your school administrator to check your account.
             </p>
           </div>
         </div>

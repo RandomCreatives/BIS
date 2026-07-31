@@ -10,7 +10,21 @@ export function todayISO(): string {
 }
 
 export function isValidISODate(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  // Date.UTC normalizes impossible dates (for example, February 31). Compare
+  // every component so only real Gregorian calendar dates are accepted.
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
 }
 
 /** Shift a YYYY-MM-DD date by n days (UTC math, no DST surprises). */
