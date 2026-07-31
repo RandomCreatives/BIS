@@ -30,7 +30,8 @@ export async function upsertStudent(formData: FormData) {
   const formPath = isNew ? '/admin/students/new' : `/admin/students/${id}`;
 
   const fullName = String(formData.get('full_name') ?? '').trim();
-  const gender = normalizeGender(String(formData.get('gender') ?? ''));
+  const genderRaw = String(formData.get('gender') ?? '');
+  const gender = normalizeGender(genderRaw);
   const dobRaw = String(formData.get('date_of_birth') ?? '').trim();
   const dob = dobRaw || null;
   const isSN = formData.get('is_special_needs') === 'on';
@@ -38,8 +39,10 @@ export async function upsertStudent(formData: FormData) {
   const status = String(formData.get('status') ?? 'active');
   const classId = String(formData.get('class_id') ?? '').trim() || null;
 
+  if (!isNew && !UUID_RE.test(id)) back('/admin/students', false, 'Invalid student.');
   if (!fullName) back(formPath, false, 'Full name is required.');
   if (fullName.length > 255) back(formPath, false, 'Full name is too long.');
+  if (genderRaw.trim() && !gender) back(formPath, false, 'Invalid gender.');
   if (dob && !isValidISODate(dob)) back(formPath, false, 'Date of birth must be YYYY-MM-DD.');
   if (!STUDENT_STATUSES.has(status)) back(formPath, false, 'Invalid status.');
   if (snTeacher && !UUID_RE.test(snTeacher)) back(formPath, false, 'Invalid special-needs teacher.');
@@ -55,6 +58,7 @@ export async function upsertStudent(formData: FormData) {
       .select('id')
       .eq('id', snTeacher)
       .eq('role', 'special_needs_teacher')
+      .eq('is_active', true)
       .single();
     if (!t) back(formPath, false, 'Assigned teacher must have the Special Needs Teacher role.');
   }
@@ -119,16 +123,36 @@ export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
   if (!Array.isArray(rows) || rows.length === 0) return { ok: false, message: 'No rows to import.' };
   if (rows.length > 1000) return { ok: false, message: 'Import is limited to 1,000 rows at a time.' };
 
-  // Sanitize: only expected keys, bounded strings, normalized gender.
-  const clean = rows.slice(0, 1000).map((r) => ({
-    full_name: String(r.full_name ?? '').slice(0, 255).trim(),
-    class: String(r.class ?? '').slice(0, 100).trim(),
-    gender: normalizeGender(String(r.gender ?? '')) ?? undefined,
-    date_of_birth:
-      r.date_of_birth && isValidISODate(String(r.date_of_birth).trim())
-        ? String(r.date_of_birth).trim()
-        : undefined,
-  }));
+  // Keep only expected keys and reject (rather than silently truncate/drop)
+  // malformed values at the server-action boundary. The RPC repeats the bounds.
+  const clean: ImportRow[] = [];
+  for (const [index, row] of rows.entries()) {
+    if (!row || typeof row !== 'object') {
+      return { ok: false, message: `Row ${index + 1} is not a valid record.` };
+    }
+    const fullName = String(row.full_name ?? '').trim();
+    const className = String(row.class ?? '').trim();
+    const genderRaw = String(row.gender ?? '').trim();
+    const gender = normalizeGender(genderRaw);
+    const dateOfBirth = String(row.date_of_birth ?? '').trim();
+
+    if (fullName.length > 255 || className.length > 100) {
+      return { ok: false, message: `Row ${index + 1} contains an overlong name or class.` };
+    }
+    if (genderRaw && !gender) {
+      return { ok: false, message: `Row ${index + 1} has an invalid gender.` };
+    }
+    if (dateOfBirth && !isValidISODate(dateOfBirth)) {
+      return { ok: false, message: `Row ${index + 1} has an invalid date of birth.` };
+    }
+
+    clean.push({
+      full_name: fullName,
+      class: className,
+      gender: gender ?? undefined,
+      date_of_birth: dateOfBirth || undefined,
+    });
+  }
 
   const nonEmpty = clean.filter((r) => r.full_name !== '');
   if (nonEmpty.length === 0) return { ok: false, message: 'Every row is missing a name.' };

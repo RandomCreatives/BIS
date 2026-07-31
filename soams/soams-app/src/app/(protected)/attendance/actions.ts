@@ -28,6 +28,10 @@ export interface SaveResult {
  * register in place rather than duplicating rows.
  */
 export async function saveAttendance(input: SaveAttendanceInput): Promise<SaveResult> {
+  if (!input || typeof input !== 'object') {
+    return { ok: false, message: 'Invalid attendance request.' };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -49,8 +53,15 @@ export async function saveAttendance(input: SaveAttendanceInput): Promise<SaveRe
     status: string;
     marked_by: string;
   }[] = [];
+  const seenStudents = new Set<string>();
   for (const r of input.records) {
-    if (!UUID_RE.test(r.studentId)) return { ok: false, message: 'Invalid student reference.' };
+    if (!r || typeof r !== 'object' || !UUID_RE.test(r.studentId)) {
+      return { ok: false, message: 'Invalid student reference.' };
+    }
+    if (seenStudents.has(r.studentId)) {
+      return { ok: false, message: 'A student appears more than once in this register.' };
+    }
+    seenStudents.add(r.studentId);
     if (!STATUSES.has(r.status)) return { ok: false, message: `Invalid status: "${r.status}".` };
     rows.push({
       student_id: r.studentId,
