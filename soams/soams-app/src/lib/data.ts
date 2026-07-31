@@ -12,6 +12,7 @@ export interface Profile {
   full_name: string;
   email: string;
   role: Role;
+  is_active: boolean;
 }
 
 /**
@@ -29,7 +30,7 @@ export const getCurrentContext = cache(async () => {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role')
+    .select('id, full_name, email, role, is_active')
     .eq('id', user.id)
     .single();
 
@@ -87,6 +88,6 @@ export async function getCurrentYear() {
  */
 export async function requireAdmin(): Promise<{ userId: string } | null> {
   const { user, profile } = await getCurrentContext();
-  if (!user || !profile || profile.role !== 'admin') return null;
+  if (!user || !profile || !profile.is_active || profile.role !== 'admin') return null;
   return { userId: user.id };
 }

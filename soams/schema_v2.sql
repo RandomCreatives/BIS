@@ -1,4 +1,10 @@
 -- ============================================================================
+-- REFERENCE SNAPSHOT ONLY — DO NOT DEPLOY THIS FILE BY ITSELF.
+-- The canonical, security-hardened history is soams-app/supabase/migrations/;
+-- apply every migration there in filename order.
+-- ============================================================================
+
+-- ============================================================================
 -- SOAMS — School Operations & Academic Management System
 -- Database Schema v2 (Supabase / PostgreSQL 14+)
 --
@@ -83,20 +89,33 @@ create table profiles (
 );
 
 -- Auto-create a profile row when a user is invited through Supabase Auth.
--- Pass full_name and role in the invite's user metadata (raw_user_meta_data).
+-- full_name is display data; only trusted app metadata may seed a role. Never
+-- authorize from raw_user_meta_data because an Auth user can edit it.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.profiles (id, full_name, email, role)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
+    left(
+      coalesce(
+        nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
+        split_part(new.email, '@', 1)
+      ),
+      255
+    ),
     new.email,
-    coalesce((new.raw_user_meta_data ->> 'role')::user_role, 'subject_teacher')
+    case
+      when (new.raw_app_meta_data ->> 'role') in (
+        'admin', 'principal', 'main_teacher', 'assistant_teacher',
+        'subject_teacher', 'special_needs_teacher'
+      ) then (new.raw_app_meta_data ->> 'role')::public.user_role
+      else 'subject_teacher'::public.user_role
+    end
   );
   return new;
 end;
@@ -108,13 +127,16 @@ create trigger on_auth_user_created
 
 -- Helper: role of the currently authenticated user (used throughout RLS policies).
 create or replace function public.my_role()
-returns user_role
+returns public.user_role
 language sql
 stable
 security definer
-set search_path = public
+set search_path = ''
 as $$
-  select role from public.profiles where id = auth.uid();
+  select p.role
+  from public.profiles p
+  where p.id = (select auth.uid())
+    and p.is_active;
 $$;
 
 

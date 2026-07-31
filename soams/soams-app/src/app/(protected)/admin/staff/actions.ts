@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/data';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROLES = new Set([
   'admin',
   'principal',
@@ -28,7 +29,10 @@ export async function updateStaff(formData: FormData) {
   const role = String(formData.get('role') ?? '');
   const isActive = formData.get('is_active') === 'on';
 
+  if (!UUID_RE.test(id)) back('/admin/staff', false, 'Invalid staff member.');
   if (!fullName) back(formPath, false, 'Full name is required.');
+  if (fullName.length > 255) back(formPath, false, 'Full name is too long.');
+  if (phone && phone.length > 50) back(formPath, false, 'Phone number is too long.');
   if (!ROLES.has(role)) back(formPath, false, 'Invalid role.');
 
   // Safety rails: an admin must not lock or demote themselves.

@@ -23,6 +23,7 @@ export async function upsertClass(formData: FormData) {
   const mainTeacherId = String(formData.get('main_teacher_id') ?? '') || null;
   const assistantTeacherId = String(formData.get('assistant_teacher_id') ?? '') || null;
 
+  if (!isNew && !UUID_RE.test(id)) back('/admin/classes', false, 'Invalid class.');
   if (!className) back(formPath, false, 'Class name is required.');
   if (className.length > 50) back(formPath, false, 'Class name is too long (max 50 chars).');
   if (!UUID_RE.test(gradeLevelId)) back(formPath, false, 'Please choose a grade level.');
@@ -35,6 +36,30 @@ export async function upsertClass(formData: FormData) {
   if (!year) back(formPath, false, 'No current academic year.');
 
   const supabase = await createClient();
+
+  const selectedTeacherIds = [mainTeacherId, assistantTeacherId].filter(
+    (teacherId): teacherId is string => teacherId !== null,
+  );
+  if (selectedTeacherIds.length > 0) {
+    const { data: selectedTeachers, error: teacherError } = await supabase
+      .from('profiles')
+      .select('id, role, is_active')
+      .in('id', selectedTeacherIds);
+    if (teacherError) back(formPath, false, 'Could not verify the selected teachers.');
+
+    const byId = new Map((selectedTeachers ?? []).map((teacher) => [teacher.id, teacher]));
+    const main = mainTeacherId ? byId.get(mainTeacherId) : null;
+    const assistant = assistantTeacherId ? byId.get(assistantTeacherId) : null;
+    if (mainTeacherId && (!main || main.role !== 'main_teacher' || !main.is_active)) {
+      back(formPath, false, 'The selected main teacher is not active in that role.');
+    }
+    if (
+      assistantTeacherId &&
+      (!assistant || assistant.role !== 'assistant_teacher' || !assistant.is_active)
+    ) {
+      back(formPath, false, 'The selected assistant teacher is not active in that role.');
+    }
+  }
 
   if (isNew) {
     const { error } = await supabase.from('classes').insert({
@@ -58,7 +83,10 @@ export async function upsertClass(formData: FormData) {
         main_teacher_id: mainTeacherId,
         assistant_teacher_id: assistantTeacherId,
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('academic_year_id', year.id)
+      .select('id')
+      .single();
     if (error) {
       back(formPath, false, error.message.includes('classes_class_name_academic_year_id_key')
         ? `A class named "${className}" already exists in ${year.name}.`
