@@ -1,7 +1,7 @@
 // Shared form styling + feedback primitives for the admin CRUD pages.
 
 export const inputCls =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100';
+  'w-full rounded-lg border border-line bg-bone px-3 py-2 text-sm text-ink outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100';
 
 export const selectCls = inputCls;
 
@@ -18,11 +18,11 @@ export function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700">
+      <label className="block text-sm font-medium text-ink/80">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <div className="mt-1">{children}</div>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1 font-mono text-[11px] text-ink/50">{hint}</p>}
     </div>
   );
 }
@@ -48,7 +48,7 @@ export function MessageBanner({ params }: { params: { ok?: string; msg?: string 
 
 export function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">{children}</div>
+    <div className="rounded-xl border border-line bg-white p-5 shadow-sm">{children}</div>
   );
 }
 
@@ -64,8 +64,8 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
+        <h1 className="font-display text-2xl font-bold text-ink">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-ink/60">{subtitle}</p>}
       </div>
       {action}
     </div>

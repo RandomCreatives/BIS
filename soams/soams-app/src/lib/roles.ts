@@ -18,7 +18,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   special_needs_teacher: 'Special Needs Teacher',
 };
 
-const ALL_ROLES: Role[] = [
+export const ALL_ROLES: Role[] = [
   'admin',
   'principal',
   'main_teacher',

@@ -25,13 +25,18 @@ export default async function ProtectedLayout({
     // Authenticated in Supabase Auth but no staff profile — e.g. invited user
     // whose metadata was missing a role, or a deleted profile.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-        <div className="max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-8">
-          <h1 className="text-lg font-bold text-amber-900">Account not set up</h1>
-          <p className="mt-2 text-sm text-amber-800">
-            Your login exists but no staff profile was found. Ask your school
-            administrator to check your account&apos;s role assignment.
-          </p>
+      <div className="flex min-h-screen items-center justify-center bg-bone p-6">
+        <div className="max-w-md overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+          <div className="border-b border-line bg-bone px-4 py-2 font-mono text-[11px] font-semibold text-ink/55">
+            SOAMS OS — account notice
+          </div>
+          <div className="p-8">
+            <h1 className="font-display text-lg font-bold text-ink">Account not set up</h1>
+            <p className="mt-2 text-sm text-ink/70">
+              Your login exists but no staff profile was found. Ask your school
+              administrator to check your account&apos;s role assignment.
+            </p>
+          </div>
         </div>
       </div>
     );

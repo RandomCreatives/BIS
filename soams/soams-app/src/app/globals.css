@@ -1,19 +1,45 @@
 @import "tailwindcss";
 
-/* SOAMS brand palette (Tailwind v4 theme tokens → bg-brand-700 etc.) */
+/* ============================================================================
+   SOAMS — Retro-Editorial Digital Stationery
+   Warm bone backdrop + crisp white cards + charcoal text + retro status pills
+   (see UI design.md)
+   ========================================================================== */
+
 @theme {
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dfe9ff;
-  --color-brand-200: #c5d6fe;
-  --color-brand-300: #a1b8fc;
-  --color-brand-400: #7b93f8;
-  --color-brand-500: #5b6ef2;
-  --color-brand-600: #4549e6;
-  --color-brand-700: #3a3ccb;
-  --color-brand-800: #3134a4;
-  --color-brand-900: #2d3182;
+  /* Brand indigo (WA / primary accents) */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+
+  /* Retro-editorial stationery */
+  --color-bone: #f7f7f4; /* warm off-white backdrop */
+  --color-line: #e4e4e7; /* thin 1px crisp card borders */
+  --color-ink: #18181b; /* high-contrast charcoal text */
+
+  /* Retro status pills — standards attainment */
+  --color-wt: #b45309;
+  --color-wt-bg: #fef3c7;
+  --color-wt-line: #fde68a;
+  --color-ww: #15803d;
+  --color-ww-bg: #dcfce7;
+  --color-ww-line: #bbf7d0;
+  --color-wa: #4f46e5;
+  --color-wa-bg: #eef2ff;
+  --color-wa-line: #c7d2fe;
+
+  /* Retro-modern type: Space Grotesk (display) + IBM Plex Mono (subtext) */
+  --font-display: var(--soams-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--soams-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-bone text-ink antialiased;
 }
