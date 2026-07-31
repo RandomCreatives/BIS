@@ -4,32 +4,35 @@ Web platform replacing paper records and MS Publisher workflows for a school of
 ~250 students / 12 classes / 35–40 staff. Next.js 16 (App Router) + Supabase
 (Postgres, Auth, RLS, Storage).
 
-**Docs:** schema design decisions → [`../SCHEMA_V2_NOTES.md`](../SCHEMA_V2_NOTES.md) ·
-validated schema → `supabase/migrations/20260731000000_schema_v2.sql`
+**Docs:** schema decisions → [`../SCHEMA_V2_NOTES.md`](../SCHEMA_V2_NOTES.md) ·
+architecture → [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) ·
+security → [`../../SECURITY.md`](../../SECURITY.md) · canonical schema history →
+`supabase/migrations/`
 
 ---
 
 ## Quickstart
 
 ```bash
-# 1. Install & run the scaffold immediately (shows the setup notice)
-npm install
+# 1. Install & run the scaffold (Node 22+; shows the setup notice)
+npm ci
 npm run dev          # http://localhost:3000
 
-# 2. Create a Supabase project (free tier is fine)
+# 2. Create a Supabase project
 #    https://supabase.com/dashboard → New project
 
-# 3. Apply the database schema
-#    Dashboard → SQL Editor → paste supabase/migrations/20260731000000_schema_v2.sql → Run
-#    (or: supabase link --project-ref <ref> && supabase db push)
+# 3. Apply EVERY migration in filename order
+#    Recommended: supabase link --project-ref <ref> && supabase db push
+#    Dashboard alternative: run each supabase/migrations/*.sql file in order.
 
 # 4. Connect the app
 cp .env.local.example .env.local   # fill in URL + anon key, then restart dev server
 
-# 5. Invite the first admin
-#    Dashboard → Authentication → Add user → Invite, with user metadata:
-#    { "full_name": "Your Name", "role": "admin" }
-#    The on_auth_user_created trigger creates the profiles row automatically.
+# 5. Disable public sign-up, then invite the first admin with full_name metadata.
+#    The trigger creates a least-privileged profile. In the trusted SQL editor,
+#    verify the exact email and bootstrap it once:
+#    update public.profiles set role = 'admin' where email = 'admin@school.example';
+#    Never put authorization roles in user-editable user metadata.
 ```
 
 ## What's in this scaffold
@@ -67,7 +70,10 @@ src/
       announcements/            # working module (list + mark-as-read RPC)
       attendance|evaluations|reports|lesson-plans|iep|admin/page.tsx
 supabase/
-  migrations/20260731000000_schema_v2.sql   # 17 tables, RLS, RPCs, seed data
+  migrations/
+    20260731000000_schema_v2.sql             # 17 tables, initial RLS, seed data
+    20260801000000_import_students_rpc.sql   # atomic bounded import
+    20260801010000_security_hardening.sql    # active-user and integrity policies
   config.toml
 ```
 
@@ -79,7 +85,16 @@ supabase/
    render (server-side).
 3. **`proxy.ts`** performs optimistic redirects and session refresh only —
    by design it is *not* the authorization boundary (see CVE-2025-29927).
-4. `iep_entries` is privacy-critical: assigned special-needs teacher + admin only.
+4. Deactivated profiles lose their effective database role and all RLS access,
+   even while an old Auth session exists.
+5. `iep_entries` is privacy-critical: active assigned special-needs teacher +
+   admin only.
+6. Security-definer RPCs authorize internally, bound inputs, use a controlled
+   search path, and are not executable by anonymous users.
+
+Before live data, complete every launch gate in
+[`../../SECURITY.md`](../../SECURITY.md) and
+[`../../docs/SCALABILITY.md`](../../docs/SCALABILITY.md).
 
 ## Next build steps (roadmap order)
 
@@ -96,9 +111,9 @@ supabase/
 ## Useful commands
 
 ```bash
-npm run dev        # dev server
-npm run build      # production build
-npm run lint       # eslint
+npm run dev        # development server
+npm run check      # lint + typecheck + unit tests + production build
+npm run audit:prod # fail on high-severity production dependency advisories
 # Generate TypeScript types from the live DB (after linking):
 npx supabase gen types typescript --linked > src/lib/database.types.ts
 # Then pass <Database> generics into the createClient calls.

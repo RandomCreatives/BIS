@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /soams/soams-app
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:00'
+      timezone: Africa/Addis_Ababa
+    open-pull-requests-limit: 5
+    groups:
+      next-and-react:
+        patterns:
+          - next
+          - eslint-config-next
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+      supabase:
+        patterns:
+          - '@supabase/*'
+      development-tooling:
+        dependency-type: development
+        patterns:
+          - '*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3

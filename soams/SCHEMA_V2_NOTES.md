@@ -21,7 +21,7 @@ Maps to the gap list from the design review.
 | 7 | **Criteria keyed by yearly class** — rebuilt from scratch every September | New `grade_levels` table; `term_criteria` is now a **reusable curriculum library** per *(subject, grade level, term number)*. Retire old criteria with `is_active = false` instead of deleting (protects historical evaluations). |
 | 8 | **`principal_signed` but no principal role** | `principal` added to `user_role`. Sign-off is now `signed_by` (who) + `signed_at` (when) columns on `term_reports`, not booleans — richer audit trail. |
 | 9 | **No term closure / locking** | Two mechanisms: (a) `terms.locked_at` freezes **evaluation entry** for that term (enforced in RLS `WITH CHECK`), (b) `term_reports.status` = `draft → published`, where teachers can only ever write `draft` — publishing is admin/principal-only by policy. |
-| 10 | **No auth linkage** | `profiles.id` now references `auth.users(id)` (standard Supabase pattern) with an `on_auth_user_created` trigger — staff are onboarded by inviting them in Supabase Auth with `full_name` and `role` in user metadata. |
+| 10 | **No auth linkage** | `profiles.id` now references `auth.users(id)` (standard Supabase pattern) with an `on_auth_user_created` trigger. The security-hardening migration accepts `full_name` from user metadata but never trusts user-editable metadata for a role. |
 
 **Minor fixes:** role default removed from `profiles` (no insecure default); `lesson_plans` gets `unique(teacher_id, subject_id, class_id, term_id, week_number)` plus `reviewed_by/reviewed_at`; announcement `target_role` is now a proper enum (`announcement_audience` + `user_role`); `students.status` (`active/transferred/graduated`) replaces hard deletes; `updated_at` triggers added to 6 mutable tables; indexes added for every hot query path.
 
@@ -62,9 +62,9 @@ Keep them separate: you often want to lock entry *before* certificates are revie
 ## 3. How the app uses this (Supabase wiring)
 
 ### 3.1 Onboarding a staff member
-1. Admin invites the user in Supabase Auth (dashboard or `admin.inviteUserByEmail`) with user metadata: `{ "full_name": "...", "role": "main_teacher" }`.
-2. The `on_auth_user_created` trigger creates the `profiles` row automatically.
-3. Admin then assigns classes/subjects via `classes`, `teaching_assignments`, `enrollments`.
+1. Admin invites the user in Supabase Auth (dashboard or `admin.inviteUserByEmail`) with display metadata only: `{ "full_name": "..." }`.
+2. The `on_auth_user_created` trigger creates a least-privileged `profiles` row. It never accepts a role from user-editable metadata.
+3. An existing Admin assigns the correct profile role and then classes/subjects via `classes`, `teaching_assignments`, and `enrollments`. Bootstrap the first Admin once through the trusted SQL editor as described in the operations runbook.
 
 ### 3.2 Storage buckets to create (not in SQL — do in Dashboard/CLI)
 | Bucket | Access | Contents |
@@ -83,21 +83,25 @@ Suggested path conventions: `lesson-plan-files/{teacher_id}/{term_id}/week_{n}.p
 
 ---
 
-## 4. RLS policy model (starter set)
+## 4. RLS policy model
 
-All 17 tables have RLS enabled. The shipped policies implement:
+All 17 tables have RLS enabled. Apply every migration, including
+`20260801010000_security_hardening.sql`; it makes active staff status a
+restrictive condition on every policy and closes row-integrity gaps in the
+original starter set. The resulting policies implement:
 
 | Data | Read | Write |
 |------|------|-------|
 | Reference data (years, terms, subjects, grades, criteria, classes, assignments) | all authenticated staff | admin / principal |
 | `profiles` | own row; admin/principal all | self (name/phone only — the `role = my_role()` check blocks privilege escalation); admin all |
 | `students` | staff with a working relationship (main/assistant teacher of current class, assigned subject teacher, assigned SN teacher, admin/principal) | admin |
-| `enrollments`, `daily_attendance` | class main/assistant teacher, related subject teachers, admin | class main/assistant teacher, admin |
+| `enrollments` | class main/assistant teacher, related subject teachers, admin/principal | admin |
+| `daily_attendance` | class main/assistant teacher, admin/principal | class main/assistant teacher, admin; student/class/year and actor integrity enforced |
 | `student_evaluations` | evaluator, related subject teachers, class main teacher, admin/principal | assigned subject teacher while term unlocked (see §2.3), admin |
 | `term_reports` | class main/assistant teacher, admin/principal | main teacher **draft only**; admin/principal publish |
 | `lesson_plans` | author, admin/principal | author while `draft`/`needs_revision` (may flip to `submitted`); admin/principal review |
 | `iep_entries` | author, assigned SN teacher, admin | author being the assigned SN teacher, admin |
-| `announcements` + recipients | sender-side admin/principal; recipient sees own | publish via `publish_announcement()`; recipients can only set their own `read_at` |
+| `announcements` + recipients | sender-side admin/principal; recipient sees own | constrained `publish_announcement()` and `mark_announcement_read()` RPCs only; recipient identity cannot be updated directly |
 
 **To confirm with the school before launch:**
 - Should the **principal** (beyond admin) read IEP entries? Currently no — deliberately private.
@@ -107,7 +111,7 @@ All 17 tables have RLS enabled. The shipped policies implement:
 
 **Implementation notes:**
 - Test every policy with `set request.jwt.claims` / different users in the Supabase SQL editor before launch. The starter set covers the FR permission matrix but deserves a dedicated test pass.
-- `my_role()` is `stable security definer` — one row-lookup per query; fine at 40-user scale. If profiling ever shows it hot, swap for a custom JWT claim hook.
+- `my_role()` is `stable security definer` and returns no role for an inactive profile. `is_active_staff()` is also enforced through restrictive policies, including relationship policies that compare `auth.uid()` directly. One indexed profile lookup per query is fine at this scale; profile before changing to a custom JWT-claim hook.
 
 ---
 
@@ -135,16 +139,17 @@ All 17 tables have RLS enabled. The shipped policies implement:
 ## 7. Applying the schema
 
 ```bash
-# Option A — Supabase dashboard: paste schema_v2.sql into the SQL Editor, run once.
-
-# Option B — Supabase CLI (recommended once the app repo exists):
-supabase init
-supabase db start
-psql "$DATABASE_URL" -f schema_v2.sql        # or split into supabase/migrations/
+# Canonical path — apply every file under soams-app/supabase/migrations in order:
+cd soams-app
+supabase link --project-ref <project-ref>
+supabase db push
 ```
+
+`schema_v2.sql` is the original design snapshot, not the complete migration
+history; do not deploy it by itself.
 
 Remember afterwards:
 - [ ] Create the 2 Storage buckets (§3.2)
 - [ ] Adjust seed term dates to the school's real calendar
-- [ ] Invite the first admin and verify the profile trigger fired
-- [ ] Run the RLS test pass (§4)
+- [ ] Disable public sign-up, invite the first admin, verify the profile trigger, and bootstrap its role through the trusted SQL editor
+- [ ] Run the RLS test pass (§4), including inactive and wrong-assignment cases
