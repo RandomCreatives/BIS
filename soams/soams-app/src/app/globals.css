@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* SOAMS brand palette (Tailwind v4 theme tokens → bg-brand-700 etc.) */
+@theme {
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dfe9ff;
+  --color-brand-200: #c5d6fe;
+  --color-brand-300: #a1b8fc;
+  --color-brand-400: #7b93f8;
+  --color-brand-500: #5b6ef2;
+  --color-brand-600: #4549e6;
+  --color-brand-700: #3a3ccb;
+  --color-brand-800: #3134a4;
+  --color-brand-900: #2d3182;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}

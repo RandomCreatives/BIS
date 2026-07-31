@@ -1,0 +1,17 @@
+# Tooling config (agent/IDE settings) — not project code
+.config/
+
+# Dependencies & build artifacts (soams-app has its own .gitignore too)
+node_modules/
+.next/
+out/
+build/
+
+# Environment files — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
