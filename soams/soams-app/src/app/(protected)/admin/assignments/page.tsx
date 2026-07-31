@@ -5,9 +5,12 @@ import { getCurrentContext, getCurrentYear } from '@/lib/data';
 import { MessageBanner, PageHeader, Card, selectCls } from '@/components/forms';
 import { SubmitButton } from '@/components/submit-button';
 import { addAssignment, removeAssignment } from './actions';
+import { colorDot, colorLabel } from '@/lib/classColors';
 
 // Teaching assignments drive WHO MAY EVALUATE WHAT (schema v2 §2.3) —
 // this page is effectively the permission editor for Phase 2.
+// Per the school model, BOTH Main Teachers (Math/Science in their own class)
+// and Subject Teachers (across many classes) get assignments here.
 export default async function AssignmentsPage({
   searchParams,
 }: {
@@ -34,10 +37,18 @@ export default async function AssignmentsPage({
   const supabase = await createClient();
   const { data: classRows } = await supabase
     .from('classes')
-    .select('id, class_name')
+    .select(
+      'id, class_name, color, main_teacher:profiles!classes_main_teacher_id_fkey(full_name), assistant_teacher:profiles!classes_assistant_teacher_id_fkey(full_name)',
+    )
     .eq('academic_year_id', year.id)
     .order('class_name');
-  const classes = (classRows ?? []) as { id: string; class_name: string }[];
+  const classes = (classRows ?? []) as {
+    id: string;
+    class_name: string;
+    color: string | null;
+    main_teacher: { full_name: string } | { full_name: string }[] | null;
+    assistant_teacher: { full_name: string } | { full_name: string }[] | null;
+  }[];
   const selectedId =
     params.class && classes.some((c) => c.id === params.class)
       ? params.class
@@ -55,7 +66,7 @@ export default async function AssignmentsPage({
     supabase
       .from('profiles')
       .select('id, full_name')
-      .eq('role', 'subject_teacher')
+      .in('role', ['main_teacher', 'subject_teacher'])
       .eq('is_active', true)
       .order('full_name'),
   ]);
@@ -64,7 +75,7 @@ export default async function AssignmentsPage({
     <div className="space-y-4">
       <PageHeader
         title="Teaching Assignments"
-        subtitle={`${year.name} · which subject teacher teaches which subject in which class — this powers evaluation access (RLS)`}
+        subtitle={`${year.name} · who teaches which subject in which class — powers marksheet access (RLS). Main teachers get Math/Science in their own class; subject teachers are spread across classes.`}
       />
       <MessageBanner params={params} />
 
@@ -80,16 +91,43 @@ export default async function AssignmentsPage({
               <Link
                 key={c.id}
                 href={`/admin/assignments?class=${c.id}`}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
                   c.id === selectedId
                     ? 'bg-brand-700 text-white'
                     : 'border border-slate-300 bg-white text-slate-600 hover:border-brand-400'
                 }`}
               >
+                <span className={`h-2 w-2 rounded-full ${colorDot(c.color)}`} />
                 {c.class_name}
               </Link>
             ))}
           </div>
+
+          {selected && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+              <span className="flex items-center gap-2 font-semibold text-slate-900">
+                <span className={`h-2.5 w-2.5 rounded-full ${colorDot(selected.color)}`} />
+                {selected.class_name}
+              </span>
+              <span className="text-slate-600">
+                <span className="font-mono text-[11px] uppercase tracking-wide text-slate-400">Main teacher · </span>
+                {(() => {
+                  const mt = selected.main_teacher;
+                  const t = Array.isArray(mt) ? mt[0] : mt;
+                  return (t?.full_name as string | undefined) ?? '—';
+                })()}
+              </span>
+              <span className="text-slate-600">
+                <span className="font-mono text-[11px] uppercase tracking-wide text-slate-400">Assistant · </span>
+                {(() => {
+                  const at = selected.assistant_teacher;
+                  const t = Array.isArray(at) ? at[0] : at;
+                  return (t?.full_name as string | undefined) ?? '—';
+                })()}
+              </span>
+              <span className="text-xs text-slate-400">{colorLabel(selected.color)}</span>
+            </div>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
@@ -125,7 +163,7 @@ export default async function AssignmentsPage({
                 })}
                 {(assignments ?? []).length === 0 && (
                   <li className="py-6 text-center text-sm text-slate-500">
-                    No assignments yet — add subject teachers on the right.
+                    No assignments yet — add Main or Subject Teachers on the right.
                   </li>
                 )}
               </ul>
@@ -149,7 +187,7 @@ export default async function AssignmentsPage({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Subject teacher</label>
+                  <label className="block text-sm font-medium text-slate-700">Teacher</label>
                   <select name="teacher_id" required className={`${selectCls} mt-1`}>
                     <option value="" disabled selected>
                       — Choose teacher —
@@ -162,7 +200,7 @@ export default async function AssignmentsPage({
                   </select>
                   {(teachers ?? []).length === 0 && (
                     <p className="mt-1 text-xs text-amber-700">
-                      No active Subject Teachers on staff yet — invite them first (see Staff page).
+                      No active Main or Subject Teachers on staff yet — invite them first (see Staff page).
                     </p>
                   )}
                 </div>

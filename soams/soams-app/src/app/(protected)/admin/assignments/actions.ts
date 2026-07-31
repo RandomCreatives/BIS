@@ -25,14 +25,14 @@ export async function addAssignment(formData: FormData) {
 
   const supabase = await createClient();
 
-  // The subjects UI is role-scoped; verify the picked teacher really is a subject teacher.
+  // The subjects UI is role-scoped; verify the picked teacher really can teach a subject.
   const { data: teacher } = await supabase
     .from('profiles')
     .select('id, role, is_active, full_name')
     .eq('id', teacherId)
     .single();
-  if (!teacher || (teacher.role as string) !== 'subject_teacher') {
-    back(path, false, 'Assignments require a staff member with the Subject Teacher role.');
+  if (!teacher || !['subject_teacher', 'main_teacher'].includes(teacher.role as string)) {
+    back(path, false, 'Assignments require a staff member with the Main or Subject Teacher role.');
   }
   if (!teacher.is_active) back(path, false, `${teacher.full_name}'s account is deactivated.`);
 

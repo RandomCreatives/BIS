@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentContext, getCurrentYear } from '@/lib/data';
 import { MessageBanner, PageHeader } from '@/components/forms';
+import { colorDot, colorLabel } from '@/lib/classColors';
 
 export default async function ClassesPage({
   searchParams,
@@ -31,7 +32,7 @@ export default async function ClassesPage({
   const { data: classRows } = await supabase
     .from('classes')
     .select(
-      'id, class_name, grade_levels(name, sort_order), main:profiles!main_teacher_id(full_name), asst:profiles!assistant_teacher_id(full_name)',
+      'id, class_name, color, grade_levels(name, sort_order), main:profiles!main_teacher_id(full_name), asst:profiles!assistant_teacher_id(full_name)',
     )
     .eq('academic_year_id', year.id)
     .order('class_name');
@@ -54,6 +55,7 @@ export default async function ClassesPage({
     return {
       id: c.id as string,
       name: c.class_name as string,
+      color: (c.color as string | null) ?? null,
       grade: (gl as { name?: string; sort_order?: number } | null)?.name ?? '—',
       sort: (gl as { sort_order?: number } | null)?.sort_order ?? 99,
       main: (main as { full_name?: string } | null)?.full_name ?? null,
@@ -93,7 +95,13 @@ export default async function ClassesPage({
           <tbody className="divide-y divide-slate-100">
             {rows.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2.5 font-medium text-slate-900">{c.name}</td>
+                <td className="px-4 py-2.5">
+                  <span className="flex items-center gap-2 font-medium text-slate-900">
+                    <span className={`h-2.5 w-2.5 rounded-full ${colorDot(c.color)}`} />
+                    {c.name}
+                  </span>
+                  <span className="text-xs text-slate-400">{colorLabel(c.color)}</span>
+                </td>
                 <td className="px-4 py-2.5 text-slate-600">{c.grade}</td>
                 <td className="px-4 py-2.5 tabular-nums text-slate-600">{c.students}</td>
                 <td className="px-4 py-2.5 text-slate-600">

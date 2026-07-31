@@ -14,13 +14,15 @@ import {
   type GridStudent,
   type TermSummary,
 } from './attendance-grid';
+import { colorDot, colorLabel } from '@/lib/classColors';
 
-const MODULE_ROLES = new Set(['admin', 'principal', 'main_teacher', 'assistant_teacher']);
+const MODULE_ROLES = new Set(['admin', 'principal', 'main_teacher']);
 
 interface ClassOption {
   id: string;
   name: string;
   grade: string;
+  color: string | null;
   mainTeacherId: string | null;
   assistantTeacherId: string | null;
 }
@@ -52,7 +54,7 @@ export default async function AttendancePage({
     return (
       <Notice
         title="Not authorized"
-        body="The attendance module is available to Main Teachers, Assistant Teachers, Admin and the Principal."
+        body="The attendance register is owned by each class's Main Teacher (plus Admin and the Principal)."
       />
     );
   }
@@ -78,12 +80,12 @@ export default async function AttendancePage({
   // --- classes this user may work with ---
   let classQuery = supabase
     .from('classes')
-    .select('id, class_name, main_teacher_id, assistant_teacher_id, grade_levels(name)')
+    .select(
+      'id, class_name, color, main_teacher_id, assistant_teacher_id, grade_levels(name)',
+    )
     .eq('academic_year_id', year.id);
   if (profile.role !== 'admin' && profile.role !== 'principal') {
-    classQuery = classQuery.or(
-      `main_teacher_id.eq.${user.id},assistant_teacher_id.eq.${user.id}`,
-    );
+    classQuery = classQuery.eq('main_teacher_id', user.id);
   }
   const { data: classRows } = await classQuery;
 
@@ -96,6 +98,7 @@ export default async function AttendancePage({
         id: String(r.id),
         name: String(r.class_name),
         grade,
+        color: (r.color as string | null) ?? null,
         mainTeacherId: (r.main_teacher_id as string | null) ?? null,
         assistantTeacherId: (r.assistant_teacher_id as string | null) ?? null,
       };
@@ -106,7 +109,7 @@ export default async function AttendancePage({
     return (
       <Notice
         title="No classes assigned"
-        body={`${year.name}: you are not listed as a main or assistant teacher for any class. Ask the administrator to update class assignments.`}
+        body={`${year.name}: you are not listed as the main teacher for any class. Ask the administrator to update class assignments.`}
       />
     );
   }
@@ -158,8 +161,13 @@ export default async function AttendancePage({
                 href={`/attendance?class=${c.id}&date=${today}`}
                 className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-300 hover:shadow"
               >
-                <h3 className="font-semibold text-slate-900">{c.name}</h3>
-                <p className="text-xs text-slate-500">{c.grade}</p>
+                <h3 className="flex items-center gap-2 font-semibold text-slate-900">
+                  <span className={`h-2.5 w-2.5 rounded-full ${colorDot(c.color)}`} />
+                  {c.name}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {c.grade} · {colorLabel(c.color)}
+                </p>
                 <p className={`mt-3 text-sm font-semibold ${state.cls}`}>{state.text}</p>
                 <p className="mt-1 text-xs text-slate-400">Tap to open today&apos;s register →</p>
               </Link>
@@ -226,10 +234,7 @@ export default async function AttendancePage({
     schoolDays = days.size;
   }
 
-  const canEdit =
-    profile.role === 'admin' ||
-    klass.mainTeacherId === user.id ||
-    klass.assistantTeacherId === user.id;
+  const canEdit = profile.role === 'admin' || klass.mainTeacherId === user.id;
 
   const prevDay = shiftISODate(date, -1);
   const nextDay = shiftISODate(date, 1);
@@ -238,9 +243,12 @@ export default async function AttendancePage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{klass.name}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+            <span className={`h-3 w-3 rounded-full ${colorDot(klass.color)}`} />
+            {klass.name}
+          </h1>
           <p className="mt-1 text-sm text-slate-600">
-            {year.name} · {klass.grade}
+            {year.name} · {klass.grade} · {colorLabel(klass.color)}
             {term
               ? ` · Term ${term.term_number} (${schoolDays} school day${schoolDays === 1 ? '' : 's'} marked)`
               : ' · outside term dates'}
@@ -252,12 +260,13 @@ export default async function AttendancePage({
               <Link
                 key={c.id}
                 href={`/attendance?class=${c.id}&date=${date}`}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
                   c.id === selectedId
                     ? 'bg-brand-700 text-white'
                     : 'border border-slate-300 bg-white text-slate-600 hover:border-brand-400'
                 }`}
               >
+                <span className={`h-2 w-2 rounded-full ${colorDot(c.color)}`} />
                 {c.name}
               </Link>
             ))}
@@ -314,7 +323,7 @@ export default async function AttendancePage({
       )}
       {!canEdit && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          👁️ Read-only view — only the class main/assistant teacher (or Admin) can edit this
+          👁️ Read-only view — only the class Main Teacher (or Admin) can edit this
           register.
         </div>
       )}

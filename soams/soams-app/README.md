@@ -74,6 +74,7 @@ supabase/
     20260731000000_schema_v2.sql             # 17 tables, initial RLS, seed data
     20260801000000_import_students_rpc.sql   # atomic bounded import
     20260801010000_security_hardening.sql    # active-user and integrity policies
+    20260802000000_class_colors_and_roles.sql # class colors, 12-class seed, Music, main-teacher attendance
   config.toml
 ```
 

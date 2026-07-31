@@ -8,6 +8,7 @@ const MIGRATIONS = [
   '20260731000000_schema_v2.sql',
   '20260801000000_import_students_rpc.sql',
   '20260801010000_security_hardening.sql',
+  '20260802000000_class_colors_and_roles.sql',
 ];
 const MIGRATIONS_URL = new URL('../supabase/migrations/', import.meta.url);
 
@@ -16,6 +17,7 @@ const ids = {
   main: '00000000-0000-4000-8000-000000000002',
   subject: '00000000-0000-4000-8000-000000000003',
   attacker: '00000000-0000-4000-8000-000000000004',
+  asst: '00000000-0000-4000-8000-000000000005',
   student1: '10000000-0000-4000-8000-000000000001',
   student2: '10000000-0000-4000-8000-000000000002',
   class1: '20000000-0000-4000-8000-000000000001',
@@ -66,7 +68,8 @@ test('migrations enforce critical RLS and RPC boundaries', async (t) => {
       ('${ids.admin}', 'admin@example.test', '{"full_name":"Admin"}', '{"role":"admin"}'),
       ('${ids.main}', 'main@example.test', '{"full_name":"Main"}', '{"role":"main_teacher"}'),
       ('${ids.subject}', 'subject@example.test', '{"full_name":"Subject"}', '{"role":"subject_teacher"}'),
-      ('${ids.attacker}', 'attacker@example.test', '{"full_name":"Attacker","role":"admin"}', '{}');
+      ('${ids.attacker}', 'attacker@example.test', '{"full_name":"Attacker","role":"admin"}', '{}'),
+      ('${ids.asst}', 'asst@example.test', '{"full_name":"Assistant"}', '{"role":"assistant_teacher"}');
   `);
   const attackerProfile = await db.query(
     `select role::text from profiles where id = '${ids.attacker}'`,
@@ -85,10 +88,10 @@ test('migrations enforce critical RLS and RPC boundaries', async (t) => {
   const context = contextResult.rows[0];
 
   await db.exec(`
-    insert into classes (id, class_name, grade_level_id, academic_year_id, main_teacher_id)
+    insert into classes (id, class_name, grade_level_id, academic_year_id, main_teacher_id, assistant_teacher_id)
     values
-      ('${ids.class1}', 'Year 1 Test', '${context.grade1}', '${context.year_id}', '${ids.main}'),
-      ('${ids.class2}', 'Year 2 Test', '${context.grade2}', '${context.year_id}', null);
+      ('${ids.class1}', 'Year 1 Test', '${context.grade1}', '${context.year_id}', '${ids.main}', '${ids.asst}'),
+      ('${ids.class2}', 'Year 2 Test', '${context.grade2}', '${context.year_id}', null, null);
     insert into students (id, full_name) values
       ('${ids.student1}', 'Student One'),
       ('${ids.student2}', 'Student Two');
@@ -138,6 +141,19 @@ test('migrations enforce critical RLS and RPC boundaries', async (t) => {
     ids.main,
     `insert into daily_attendance (student_id, class_id, date, status, marked_by)
      values ('${ids.student1}', '${ids.class1}', '2026-09-03', 'present', '${ids.admin}')`,
+  );
+
+  // Assistant teachers support in-class only: they may READ the register but
+  // no longer mark or edit it (main-teacher ownership).
+  const asstRead = await asUser(
+    ids.asst,
+    'select count(*)::int as count from daily_attendance',
+  );
+  assert.ok(asstRead.rows[0].count >= 1, 'assistant should still read the register');
+  await denied(
+    ids.asst,
+    `insert into daily_attendance (student_id, class_id, date, status, marked_by)
+     values ('${ids.student1}', '${ids.class1}', '2026-09-04', 'present', '${ids.asst}')`,
   );
 
   await asUser(

@@ -39,14 +39,24 @@ export interface ModuleDef {
 
 export const MODULES: ModuleDef[] = [
   {
+    slug: 'dashboard',
+    name: 'Home',
+    href: '/dashboard',
+    description:
+      'Overview: today\u2019s register status, quick actions, and module shortcuts. Every staff member lands here.',
+    phase: 'Live',
+    tables: [],
+    roles: ALL_ROLES,
+  },
+  {
     slug: 'attendance',
     name: 'Daily Attendance',
     href: '/attendance',
     description:
-      'Mark daily attendance per class on a mobile-friendly grid. Statuses: Present, Absent, Late, Excused. Term totals feed the certificates automatically.',
+      'Mark daily attendance per class on a mobile-friendly grid. Statuses: Present, Absent, Late, Excused. Owned by each class\u2019s Main Teacher; assistants support in-class only. Term totals feed the certificates automatically.',
     phase: 'Live',
     tables: ['daily_attendance', 'enrollments', 'classes'],
-    roles: ['admin', 'principal', 'main_teacher', 'assistant_teacher'],
+    roles: ['admin', 'principal', 'main_teacher'],
   },
   {
     slug: 'evaluations',

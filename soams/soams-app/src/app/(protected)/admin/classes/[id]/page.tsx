@@ -21,7 +21,7 @@ export default async function EditClassPage({
   const supabase = await createClient();
   const { data: klass } = await supabase
     .from('classes')
-    .select('id, class_name, grade_level_id, main_teacher_id, assistant_teacher_id')
+    .select('id, class_name, grade_level_id, color, main_teacher_id, assistant_teacher_id')
     .eq('id', id)
     .single();
   if (!klass) notFound();

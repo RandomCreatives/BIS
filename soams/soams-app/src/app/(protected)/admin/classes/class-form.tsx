@@ -1,6 +1,7 @@
 import { upsertClass } from './actions';
 import { Field, inputCls, selectCls, Card } from '@/components/forms';
 import { SubmitButton } from '@/components/submit-button';
+import { CLASS_COLORS, COLOR_META } from '@/lib/classColors';
 
 export function ClassForm({
   klass,
@@ -12,6 +13,7 @@ export function ClassForm({
     id: string;
     class_name: string;
     grade_level_id: string;
+    color: string;
     main_teacher_id: string | null;
     assistant_teacher_id: string | null;
   };
@@ -32,6 +34,29 @@ export function ClassForm({
             maxLength={50}
             className={inputCls}
           />
+        </Field>
+
+        <Field label="Class color" hint="Each class carries one of the 12 school colors.">
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {CLASS_COLORS.map((c) => {
+              const meta = COLOR_META[c];
+              const checked = (klass?.color ?? 'blue') === c;
+              return (
+                <label
+                  key={c}
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                    checked
+                      ? 'border-brand-700 bg-brand-700 text-white'
+                      : 'border-slate-300 bg-white text-slate-600 hover:border-brand-400'
+                  }`}
+                >
+                  <input type="radio" name="color" value={c} defaultChecked={checked} className="sr-only" />
+                  <span className={`h-3 w-3 rounded-full ${meta.dot}`} />
+                  {meta.label}
+                </label>
+              );
+            })}
+          </div>
         </Field>
 
         <Field label="Grade level" required>

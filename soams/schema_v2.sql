@@ -155,6 +155,12 @@ create table subjects (
   is_active boolean not null default true
 );
 
+-- Class colors — the school's 12-class color identity (one class per grade level).
+create type class_color as enum (
+  'orange', 'crimson', 'magenta', 'yellow', 'red', 'purple',
+  'blue', 'lavender', 'green', 'cyan', 'violet', 'maroon'
+);
+
 -- Classes are scoped to an academic year and recreated each September.
 -- Rollover is cheap (see SCHEMA_V2_NOTES.md) and keeps every year's data intact.
 create table classes (
@@ -162,6 +168,7 @@ create table classes (
   class_name          text not null,                        -- e.g. 'Year 3 Magenta'
   grade_level_id      uuid not null references grade_levels(id) on delete restrict,
   academic_year_id    uuid not null references academic_years(id) on delete restrict,
+  color               class_color not null default 'blue', -- the class's color identity
   main_teacher_id     uuid references profiles(id) on delete set null,
   assistant_teacher_id uuid references profiles(id) on delete set null,
   unique (class_name, academic_year_id),  -- names may repeat across years
@@ -554,7 +561,7 @@ create policy students_read on students for select to authenticated using (
 create policy students_write on students for all to authenticated
   using (public.my_role() = 'admin') with check (public.my_role() = 'admin');
 
--- ---- Attendance: main/assistant teacher of the class (admin overrides) ----
+-- ---- Attendance: main teacher of the class (admin overrides); assistant may read ----
 create policy attendance_read on daily_attendance for select to authenticated using (
   public.my_role() in ('admin','principal')
   or marked_by = auth.uid()
@@ -566,17 +573,17 @@ create policy attendance_write on daily_attendance for insert to authenticated w
   public.my_role() = 'admin'
   or exists (select 1 from classes c
              where c.id = class_id
-               and (c.main_teacher_id = auth.uid() or c.assistant_teacher_id = auth.uid()))
+               and c.main_teacher_id = auth.uid())
 );
 create policy attendance_update on daily_attendance for update to authenticated
   using (public.my_role() = 'admin'
          or exists (select 1 from classes c
                     where c.id = daily_attendance.class_id
-                      and (c.main_teacher_id = auth.uid() or c.assistant_teacher_id = auth.uid())))
+                      and c.main_teacher_id = auth.uid()))
   with check (public.my_role() = 'admin'
          or exists (select 1 from classes c
                     where c.id = daily_attendance.class_id
-                      and (c.main_teacher_id = auth.uid() or c.assistant_teacher_id = auth.uid())));
+                      and c.main_teacher_id = auth.uid()));
 
 -- ---- Evaluations: subject teacher may write ONLY for their assignments, and
 -- ---- ONLY while the term is unlocked. Main teacher may read their class. ----
@@ -694,7 +701,7 @@ insert into grade_levels (name, sort_order) values
 
 insert into subjects (name) values
   ('Amharic'), ('English'), ('French'), ('Mathematics'),
-  ('Science'), ('Fine Art'), ('PE'), ('ICT');
+  ('Science'), ('Fine Art'), ('PE'), ('ICT'), ('Music');
 
 -- Sample academic year — REPLACE dates with the school's real 2026/2027 calendar.
 insert into academic_years (name, start_date, end_date, is_current) values
