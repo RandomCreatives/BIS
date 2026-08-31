@@ -16,7 +16,7 @@
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.4",
+    "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.109.0",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.28.0",
